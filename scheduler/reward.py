@@ -3,7 +3,7 @@ from shared.models import JobOutcome
 def compute_reward(outcome: JobOutcome) -> float:
 
     if outcome.estimated_hrs > 0:
-        speed = 1.0 - (outcome.actual_hrs / outcome.estimated_hrs)
+        speed = max(-1.0, min(1.0, 1.0 - (outcome.actual_hrs / outcome.estimated_hrs)))
     else:
         speed = 0.0
 
@@ -20,6 +20,7 @@ def compute_reward(outcome: JobOutcome) -> float:
 
     return reward
 
+#sample
 if __name__ == "__main__":
 
     good_job = JobOutcome(

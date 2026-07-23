@@ -10,11 +10,11 @@ class NodeProfile:
     gpu_vram_gb:        float
     reliability_30d:    float #completed/total jobs
     trust_score:        int #0-100
-    trust_tier:         str #gold/silver/bronxe
+    trust_tier:         str #gold/silver/bronze
     session_age_hrs:    float
     dropout_hour_risk:  float #0-1
     last_heartbeat:     float
-    instituition:       Optional[str]=None
+    institution:        Optional[str]=None
     
 @dataclass
 class JobRequest:
