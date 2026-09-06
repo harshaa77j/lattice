@@ -43,6 +43,12 @@ class SchedulingEnv(gym.Env):
 
         self._job: JobRequest | None = None
         self._nodes: List[NodeProfile] = []
+        # Ordering build_obs() actually used (sorted by node_id, truncated to
+        # N_NODES). action[i] must be mapped against this, never against
+        # self._nodes[i] — self._nodes is unsorted and untruncated, so
+        # indexing it directly reproduces the obs/action mismatch bug that
+        # BuiltObs exists to prevent (CONTEXT.md section 4).
+        self._obs_ordering: List[NodeProfile] = []
 
     def reset(self, *, seed=None, options=None) -> Tuple[np.ndarray, dict]:
         super().reset(seed=seed)
@@ -52,8 +58,10 @@ class SchedulingEnv(gym.Env):
         return self._build_obs(), {}
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, dict]:
+        # Map against self._obs_ordering, not self._nodes: self._nodes is
+        # unsorted/untruncated, so action[i] would point at the wrong node.
         assigned_nodes = [
-            n.node_id for i, n in enumerate(self._nodes) if i < len(action) and action[i] == 1
+            n.node_id for i, n in enumerate(self._obs_ordering) if i < len(action) and action[i] == 1
         ]
 
         outcome = self._fake_outcome(self._job, assigned_nodes)
@@ -73,9 +81,15 @@ class SchedulingEnv(gym.Env):
         Thin wrapper around the shared build_obs() — do not reimplement the
         vector-building logic here. This is the method Person B's parity
         test calls as `a_env._build_obs()`.
+
+        Returns the bare vector (Gymnasium requires obs to be just the
+        array) but stashes the node ordering build_obs() used on
+        self._obs_ordering, since step() needs it to map action[i] back to
+        the right node.
         """
-        progress = self.current_timestep / self.max_timesteps
-        return build_obs(self._job, self._nodes, episode_progress=progress)
+        built = build_obs(self._job, self._nodes)
+        self._obs_ordering = built.nodes
+        return built.vector
 
     def _sample_job(self) -> JobRequest:
         """Fake job for testing before real job data exists."""

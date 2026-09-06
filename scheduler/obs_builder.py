@@ -1,17 +1,29 @@
 """
-The 77-dim RL observation vector is built here.
+The 76-dim RL observation vector is built here.
 If the spec doc changes, this is the only file that needs to change.
 """
 
-from typing import List
+from typing import List, NamedTuple
 import numpy as np
 from shared.models import JobRequest, NodeProfile
 
 N_NODES = 10
 NODE_FEATURES = 7
 JOB_FEATURES = 6
-OBS_DIM = N_NODES * NODE_FEATURES + JOB_FEATURES + 1  # 77
+OBS_DIM = N_NODES * NODE_FEATURES + JOB_FEATURES  # 76
 TRUST_TIER_MAP = {"gold": 1.0, "silver": 0.66, "bronze": 0.33}
+
+
+class BuiltObs(NamedTuple):
+    """
+    vector: the observation array handed to the policy.
+    nodes: the node ordering actually used to build `vector`, truncated to
+    N_NODES. action[i] must be mapped against nodes[i], never against a
+    caller's own unsorted node list — that mismatch is the bug this type
+    exists to make impossible.
+    """
+    vector: np.ndarray
+    nodes: List[NodeProfile]
 
 def _node_features(node: NodeProfile) -> List[float]:
     #normalization
@@ -27,7 +39,13 @@ def _node_features(node: NodeProfile) -> List[float]:
 
 def _job_features(job: JobRequest) -> List[float]:
     #6 job features, normalized to ~[0, 1]
-    tier = TRUST_TIER_MAP.get(job.min_trust_tier.lower(), 0.0)
+    tier_key = job.min_trust_tier.lower()
+    if tier_key not in TRUST_TIER_MAP:
+        raise KeyError(
+            f"Unknown min_trust_tier {job.min_trust_tier!r}; "
+            f"expected one of {sorted(TRUST_TIER_MAP)}"
+        )
+    tier = TRUST_TIER_MAP[tier_key]
     compute_load = np.log1p(job.epochs * job.batch_size) / np.log1p(10_000)
     return [
         min(job.ram_required_gb / 64.0, 1.0),
@@ -41,10 +59,9 @@ def _job_features(job: JobRequest) -> List[float]:
 def build_obs(
     job: JobRequest,
     nodes: List[NodeProfile],
-    episode_progress: float = 0.0,
-) -> np.ndarray:
+) -> BuiltObs:
 
-    #Build the 77-dim observation vector for a (job, nodes) pair.
+    #Build the 76-dim observation vector for a (job, nodes) pair.
     sorted_nodes = sorted(nodes, key=lambda n: n.node_id)[:N_NODES]
 
     obs: List[float] = []
@@ -55,7 +72,6 @@ def build_obs(
             obs.extend([0.0] * NODE_FEATURES)
 
     obs.extend(_job_features(job))
-    obs.append(min(max(episode_progress, 0.0), 1.0))
     result = np.array(obs, dtype=np.float32)
     assert result.shape == (OBS_DIM,), f"expected {OBS_DIM}-dim obs, got {result.shape}"
-    return result
+    return BuiltObs(result, sorted_nodes)
