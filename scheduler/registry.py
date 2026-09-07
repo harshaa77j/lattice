@@ -27,7 +27,7 @@ def build_node_profile(node_id: str) -> NodeProfile | None:
     return NodeProfile(
         node_id=node_id,
         ram_gb=data.get('ram_gb', 0.0),
-        cpu_score=1.0 - data.get('cpu_usage', 0.0),   # convert usage to availability
+        cpu_score=1.0 - data.get('cpu_usage', 0.0),
         gpu_available=data.get('gpu_available', False),
         gpu_vram_gb=data.get('gpu_vram_gb', 0.0),
         reliability_30d=data.get('reliability_30d', 0.5),
