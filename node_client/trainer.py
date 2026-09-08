@@ -1,37 +1,49 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
+
+from node_client.model import MNISTModel
 
 
-class SimpleModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.linear = nn.Linear(1, 1)
+def train_model(dataset, initial_weights=None, node_id=1, epochs=1):
 
-    def forward(self, x):
-        return self.linear(x)
-
-
-def train_model(initial_weights=None, node_id=1):
-
-    x = torch.tensor([[1.0], [2.0], [3.0], [4.0]])
-    y = torch.tensor([[2.0], [4.0], [6.0], [8.0]])
-
-    model = SimpleModel()
+    model = MNISTModel()
 
     if initial_weights is not None:
         model.load_state_dict(initial_weights)
 
-    loss_fn = nn.MSELoss()
+    loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
-    for epoch in range(1000):
-        prediction = model(x)
-        loss = loss_fn(prediction, y)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=64,
+        shuffle=True
+    )
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    total_loss = 0.0
+    total_batches = 0
 
-    print(f"Node {node_id} finished training.")
+    model.train()
 
-    return model.state_dict()
+    for epoch in range(epochs):
+        for images, labels in dataloader:
+
+            predictions = model(images)
+            loss = loss_fn(predictions, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            total_batches += 1
+
+    average_loss = total_loss / total_batches
+
+    print(
+        f"Node {node_id} finished training. "
+        f"Average loss: {average_loss:.4f}"
+    )
+
+    return model.state_dict(), average_loss
