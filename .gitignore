@@ -1,3 +1,8 @@
 __pycache__/
 *.py[cod]
 .venv/
+
+# Local training data and outputs
+data/
+checkpoints/
+dump.rdb
